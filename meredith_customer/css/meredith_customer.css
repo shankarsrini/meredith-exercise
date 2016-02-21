@@ -1,0 +1,26 @@
+.customer-listing-page {
+    position: relative;
+    width: 100%;
+	font-family: "Open Sans",sans-serif;
+}
+.customer-listing-page .customer-listing-label {
+    position: relative;
+    width: 200px;
+	float: left;
+	font-weight: bold;
+	font-size: 20px;
+	clear: both;
+	padding-bottom: 10px;
+}
+.customer-listing-page .customer-listing-label  span {
+    float: right;
+}
+.customer-listing-page .customer-listing-content {
+    position: relative;
+    width: 400px;
+	float: left;
+	font-weight: normal;
+	font-size: 18px;
+	padding-left: 20px;
+	padding-bottom: 10px;
+}

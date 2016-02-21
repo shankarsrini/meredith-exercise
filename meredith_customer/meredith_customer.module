@@ -1,0 +1,152 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function meredith_customer_menu() {
+  $items['customer-listing'] = array(
+    'title' => t('List All Customers'),
+    'description' => t('Customer Listing page.'),
+    'page callback' => 'meredith_customer_overview_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['customer-listing/%meredith_customer/view'] = array(
+    'title' => t('View Customer'),	
+    'page callback' => 'meredith_customer_new',
+    'page arguments' => array(1),    
+    'access arguments' => array('access content'),
+    'type' => MENU_LOCAL_TASK,
+  );  
+  
+  return $items;
+}
+
+/**
+ * Load a Customer by ID.
+ */
+function meredith_customer_load($cid) {
+  $customer = meredith_customer_load_multiple($cid);
+  return $customer ? $customer[$cid] : FALSE;
+}
+
+/**
+ * Loads Customers.
+ */
+function meredith_customer_load_multiple($customer_id = '') {
+  if (empty($customer_id)) {  
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'Customer')
+      ->propertyCondition('status', NODE_PUBLISHED);
+    $result = $query->execute();
+    if (isset($result['node'])) {
+      $customer_nids = array_keys($result['node']);
+      $customer_items = entity_load('node', $customer_nids);
+    }
+  } 
+  else {
+    $customer_items = entity_load('node', array($customer_id));
+  }
+  return $customer_items;
+}
+
+/**
+ * Page callback for showing a list of MailChimp Campaign entities.
+ */
+function meredith_customer_overview_page() {
+  global $user;
+
+  $customers = meredith_customer_load_multiple();
+  $rows = array();
+  foreach ($customers as $nid => $customer) {
+    $actions = array();
+    $actions[] = l(t('View'), 'customer-listing/' . $nid .'/view');
+    if (is_array($user->roles) && in_array('administrator', $user->roles)) {
+      $actions[] = l(t('Edit'), 'node/' .$nid.'/edit');
+      $actions[] = l(t('Delete'), 'node/' .$nid.'/delete');	  
+    }
+    $dob ='';
+    if(isset($customer->field_date_of_birth['und'][0]['value'])) {
+      $dob = date('Y-m-d', strtotime($customer->field_date_of_birth['und'][0]['value']));
+    }
+    $address='';
+    if(isset($customer->field_address[LANGUAGE_NONE][0]['thoroughfare'])){
+      $address = meredith_customer_address_wrapper($customer->field_address[LANGUAGE_NONE][0]);
+    }
+    $rows[] = array(
+      l($customer->title,'customer-listing/' . $nid .'/view'),
+      $customer->field_email['und'][0]['email'],
+      $dob,
+	  $customer->field_phone_number['und'][0]['value'],      
+      $address,
+      format_date($customer->changed, 'short'),
+      implode(' | ', $actions),
+    );
+  }
+
+  return array(
+    '#theme' => 'table',
+    '#header' => array(
+      t('Customer Name'),
+      t('Email'),
+      t('Date Of Birth'),
+      t('Phone Number'),
+      t('Address'),
+      t('Changed'),
+      t('Actions'),
+    ),
+    '#rows' => $rows,
+  );
+}
+
+
+/**
+ * Display a Customer Information.
+ *
+ */
+function meredith_customer_new($customer) {
+  drupal_add_css(drupal_get_path('module', 'meredith_customer') . '/css/meredith_customer.css');
+  if (isset($customer->field_address[LANGUAGE_NONE][0]['thoroughfare'])){
+    $data['address'] = meredith_customer_address_wrapper($customer->field_address[LANGUAGE_NONE][0]);
+  }
+  if (isset($customer->field_date_of_birth['und'][0]['value'])) {
+    $data['dob'] = date('Y-m-d', strtotime($customer->field_date_of_birth['und'][0]['value']));
+  }
+  $data['name'] = $customer->title;
+  $data['email'] = $customer->field_email[LANGUAGE_NONE][0]['email'];
+  $data['phone_number'] = $customer->field_phone_number['und'][0]['value'];
+  $output = theme_render_template(drupal_get_path('module', 'meredith_customer') .'/theme/customer-view.tpl.php', array('data' => $data));   
+  return $output;
+}
+/**
+ * Display a Customer Information.
+ *
+ */
+function meredith_customer_address_wrapper($address_array){
+  if(isset($address_array) && !empty($address_array)) {
+    $address = $address_array['thoroughfare'] .',<br />';
+    $address .= $address_array['locality'].',<br />';
+    $address .= $address_array['administrative_area'].'-';
+    $address .= $address_array['postal_code'].', ';
+    $address .= $address_array['country'];
+  }
+  return $address;
+}
+
+/*
+ * hook_form_alter()
+ */
+function meredith_customer_form_alter(&$form, &$form_state, $form_id) {
+  if($form_id =='customer_node_form') {
+    $form['#validate'][] = 'meredith_customer_customer_validate';
+  }
+}
+
+function meredith_customer_customer_validate($form, &$form_state) {  
+  $values = $form_state['values'];
+  $phone = $values['field_phone_number'][LANGUAGE_NONE][0]['value'];
+  if (strlen($phone) > 0 && !preg_match('/^[0-9]{1,3}-[0-9]{3}-[0-9]{3,4}-[0-9]{3,4}$/', $phone)) {
+    form_set_error('field_phone_number', t('Phone number must be in format xxx-xxx-xxxx.'));
+  }
+}

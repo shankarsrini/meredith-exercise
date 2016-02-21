@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Meredith Customer Features feature.
+ */
+
+include_once 'meredith_customer_features.features.inc';
